@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chatbot</title>
+    
+    <!-- Add Google Fonts Link for "Inter" -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+    
+    <style>
+        body {
+            font-family: 'Inter', sans-serif; /* Use the Inter font */
+            background-color: #000000;
+            color: white;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .chat-container {
+            width: 100%;
+            border: 1px solid #ccc;
+            background-color: #333;
+            padding: 10px;
+            border-radius: 10px;
+        }
+
+        .chat-log {
+            height: 800px;
+            overflow-y: auto;
+            margin-bottom: 10px;
+            padding: 10px;
+            background-color: #444;
+            border-radius: 10px;
+        }
+
+        .chat-log div {
+            margin-bottom: 10px;
+        }
+
+        .chat-log div.bot {
+            text-align: left;
+            color: #ffffff;
+        }
+
+        .chat-log div.user {
+            text-align: left;
+            color: #d1d1d1;
+        }
+
+        .input-container {
+            display: flex;
+            gap: 10px;
+        }
+
+        input {
+            flex-grow: 1;
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+            background-color: #555;
+            color: white;
+            font-family: 'Inter', sans-serif; /* Ensure input field also uses Inter font */
+        }
+
+        button {
+            padding: 10px 20px;
+            border-radius: 5px;
+            border: none;
+            background-color: #00ff99;
+            color: black;
+            cursor: pointer;
+            font-family: 'Inter', sans-serif; /* Ensure button also uses Inter font */
+        }
+
+        button:hover {
+            background-color: #00cc88;
+        }
+
+        /* Typing indicator styles */
+        .typing {
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+        }
+
+        /*.typing::before, .typing::after {
+            content: '';
+            display: inline-block;
+            width: 6px;
+            height: 6px;
+            background-color: white;
+            border-radius: 50%;
+            margin-right: 4px;
+            animation: blink 1.5s infinite;
+        }
+
+        .typing::before {
+            animation-delay: 0s;
+        }
+
+        .typing::after {
+            animation-delay: 0.5s;
+        }*/
+
+        .typing span {
+            display: inline-block;
+            width: 6px;
+            height: 6px;
+            background-color: white;
+            border-radius: 50%;
+            margin-right: 4px;
+            animation: blink 1.5s infinite 1s;
+        }
+
+        @keyframes blink {
+            0%, 100% {
+                opacity: 0;
+            }
+            50% {
+                opacity: 1;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="chat-container">
+    <div class="chat-log" id="chat-log"></div>
+    <div class="input-container">
+        <input type="text" id="user-input" placeholder="Type your message...">
+        <button onclick="sendMessage()">Send</button>
+    </div>
+</div>
+
+<script>
+    var DB = true;
+    var History = [
+        {"role": "system", "content": "You are a helpful assistant that likes to answer more concisely unless told otherwise."}
+    ];
+
+    async function sendMessage() {
+        if (DB) {
+            DB = false;
+            const userInput = document.getElementById('user-input').value;
+            const chatLog = document.getElementById('chat-log');
+
+            if (!userInput) return;
+
+            // Add user message to chat log
+            const userMessage = document.createElement('div');
+            userMessage.classList.add('user');
+            userMessage.textContent = `You: ${userInput}`;
+            chatLog.appendChild(userMessage);
+
+            // Clear the input field
+            document.getElementById('user-input').value = '';
+
+            // Add typing indicator
+            const typingIndicator = document.createElement('div');
+            typingIndicator.classList.add('bot', 'typing');
+            typingIndicator.innerHTML = 'Bot is thinking  ‎  <span></span><span style="animation-delay: 0.33333s"></span><span style="animation-delay: 0.66666s"></span>';
+            chatLog.appendChild(typingIndicator);
+
+            // Scroll to the bottom of the chat log
+            chatLog.scrollTop = chatLog.scrollHeight;
+
+            // Send the message to the Flask backend
+            const response = await fetch('http://127.0.0.1:5000/get_response', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    message: userInput,
+                    history: History,
+                })
+            });
+
+            const data = await response.json();
+
+            // Remove typing indicator
+            chatLog.removeChild(typingIndicator);
+
+            // Add bot response with text-generation effect
+            const botMessage = document.createElement('div');
+            botMessage.classList.add('bot');
+            chatLog.appendChild(botMessage);
+            botMessage.textContent += "SB-01: "
+            const botResponse = data.response;
+            let index = 0;
+
+            await typeText(botMessage, data.response); // Start text generation
+
+            History.push({"role": "user", "content": userInput});
+            History.push({"role": "assistant", "content": data.response});
+
+            DB = true;
+        }
+    }
+
+    function typeText(element, text) {
+        return new Promise((resolve) => {
+            let index = 0;
+
+            function typeCharacter() {
+                if (index < text.length) {
+                    element.textContent += text.charAt(index);
+                    index++;
+                    setTimeout(typeCharacter, 1); // 200 ms delay between characters
+                } else {
+                    resolve(); // Resolve promise when typing is finished
+                }
+            }
+
+            typeCharacter(); // Start typing
+        });
+    }
+
+
+    document.getElementById('user-input').addEventListener('keypress', function(event) {
+        if (event.key === 'Enter' && !event.shiftKey) {
+            event.preventDefault(); // Prevent the default behavior of adding a new line
+            sendMessage();
+        }
+    });
+</script>
+
+</body>
+</html>
